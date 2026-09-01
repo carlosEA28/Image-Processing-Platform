@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: image-processing-postgres
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_DB: image_processing
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  floci:
+    image: floci/floci:latest
+    container_name: image-processing-floci
+    ports:
+      - '4566:4566'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: image-processing-api
+    ports:
+      - '3002:3000'
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/image_processing
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_ENDPOINT: http://floci:4566
+      AWS_S3_BUCKET: image-processing-bucket
+      AWS_SQS_QUEUE_URL: http://floci:4566/000000000000/image-processing
+    depends_on:
+      postgres:
+        condition: service_healthy
+      floci:
+        condition: service_started
+    volumes:
+      - ./src:/app/src
+      - /app/node_modules
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: image-processing-worker
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/image_processing
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_ENDPOINT: http://floci:4566
+      AWS_S3_BUCKET: image-processing-bucket
+      AWS_SQS_QUEUE_URL: http://floci:4566/000000000000/image-processing
+    depends_on:
+      postgres:
+        condition: service_healthy
+      floci:
+        condition: service_started
+    volumes:
+      - ./src:/app/src
+      - /app/node_modules
+
+volumes:
+  postgres_data:

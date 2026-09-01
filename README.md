@@ -1,199 +1,134 @@
 # Image Processing Platform
 
-Plataforma de processamento de imagens construída com NestJS, TypeScript e arquitetura Clean Architecture.
+API para upload e processamento assíncrono de imagens. O sistema recebe imagens, armazena no S3, envia para uma fila SQS e um worker processa as imagens (otimiza para WebP e gera thumbnail).
 
-## Objetivo
+## Pré-requisitos
 
-API para upload e processamento assíncrono de imagens. O sistema recebe imagens via upload, armazena no S3, envia para uma fila SQS e um worker processa as imagens de forma assíncrona.
+- Node.js 18+
+- Docker e Docker Compose
+- npm
 
-## Arquitetura
+## Como Rodar
 
-```
-Cliente
-   |
-   | POST /images
-   v
-NestJS API
-   |
-   ├── salva informações no PostgreSQL
-   ├── envia imagem para S3
-   └── envia mensagem para SQS
-              |
-              v
-        Image Worker
-              |
-              ├── recebe mensagem
-              ├── baixa imagem do S3
-              ├── processa com Sharp
-              ├── gera imagem otimizada (WebP)
-              ├── gera thumbnail
-              ├── envia resultados para S3
-              └── atualiza status no PostgreSQL
-```
-
-### Separação de Responsabilidades
-
-- **Domain**: Entidades, interfaces e regras de negócio
-- **Application**: Use cases e DTOs
-- **Infrastructure**: Drizzle ORM, AWS SDK, configurações
-- **Presentation**: Controllers e validação
-
-## Stack
-
-- NestJS
-- TypeScript
-- Drizzle ORM
-- PostgreSQL
-- Docker / Docker Compose
-- AWS SDK v3 (S3, SQS)
-- Sharp
-- class-validator / class-transformer
-- Jest
-
-## Estrutura de Pastas
-
-```
-src/
-├── modules/
-│   ├── images/
-│   │   ├── domain/          # Entidades e interfaces
-│   │   ├── application/     # Use cases e DTOs
-│   │   ├── infrastructure/  # Implementações (Drizzle)
-│   │   └── presentation/    # Controllers
-│   ├── health/
-│   └── users/
-├── infra/
-│   ├── database/            # Drizzle ORM, schema
-│   ├── aws/                 # S3, SQS
-│   └── config/
-├── workers/
-│   └── image-processing/    # Worker de processamento
-├── app.module.ts
-└── main.ts
-```
-
-## Como Executar Localmente
-
-### 1. Iniciar PostgreSQL
+### 1. Subir infraestrutura (PostgreSQL + LocalStack/S3/SQS)
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres floci
 ```
 
-### 2. Instalar Dependências
+### 2. Instalar dependências
 
 ```bash
 npm install
 ```
 
-### 3. Configurar Variáveis de Ambiente
+### 3. Configurar variáveis de ambiente
 
 ```bash
 cp .env.example .env
 ```
 
-Edite o arquivo `.env` com suas credenciais AWS.
-
-### 4. Executar Migrations
+### 4. Rodar migrations
 
 ```bash
 npm run db:migrate
 ```
 
-### 5. Iniciar API
+### 5. Criar bucket S3 no LocalStack
 
 ```bash
-npm run start:dev
+aws --endpoint-url=http://localhost:4566 s3 mb s3://image-processing-bucket --region us-east-1
 ```
 
-### 6. Iniciar Worker
+### 6. Iniciar API e Worker (em terminais separados)
 
 ```bash
+# Terminal 1 - API
+npm run start:dev
+
+# Terminal 2 - Worker
 npm run worker:dev
 ```
 
-## Variáveis de Ambiente
+A API estará disponível em `http://localhost:3000`.
 
-```env
-NODE_ENV=development
-PORT=3000
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/image_processing
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_S3_BUCKET=
-AWS_SQS_QUEUE_URL=
-```
+---
 
 ## Endpoints
 
-### Upload de Imagem
-
-```http
-POST /images
-Content-Type: multipart/form-data
-```
-
-### Listar Imagens
-
-```http
-GET /images?limit=10&offset=0
-```
-
-### Obter Imagem
-
-```http
-GET /images/:id
-```
-
-### Deletar Imagem
-
-```http
-DELETE /images/:id
-```
-
-### Health Check
-
-```http
-GET /health
-```
-
-## Scripts
+### Upload de imagem
 
 ```bash
-npm run start          # Iniciar aplicação
-npm run start:dev      # Iniciar em modo desenvolvimento
-npm run build          # Build da aplicação
-npm run lint           # Verificar lint
-npm run test           # Executar testes
-npm run test:watch     # Testes em watch mode
-npm run test:cov       # Testes com cobertura
-npm run db:generate    # Gerar migrations
-npm run db:migrate     # Executar migrations
-npm run db:studio      # Abrir Drizzle Studio
-npm run db:push        # Push schema para banco
-npm run worker         # Iniciar worker
-npm run worker:dev     # Iniciar worker em modo desenvolvimento
+curl -X POST http://localhost:3000/images \
+  -F "file=@sua-imagem.jpg"
 ```
 
-## Decisões Arquiteturais
+Resposta:
+```json
+{
+  "id": "uuid-da-imagem",
+  "status": "UPLOADED"
+}
+```
 
-1. **Clean Architecture**: Separação clara entre Domain, Application, Infrastructure e Presentation
-2. **Repository Pattern**: Interfaces no domínio, implementações na infraestrutura
-3. **Dependency Injection**: Tokens para interfaces, facilitando testes e troca de implementações
-4. **Abstrações AWS**: Interfaces `FileStorage` e `MessageQueue` abstraem S3 e SQS
-5. **Worker Separado**: Processamento assíncrono em módulo independente
-6. **Idempotência**: Worker verifica status antes de processar
+### Listar imagens
 
-## Próximos Passos de Infraestrutura
+```bash
+curl http://localhost:3000/images
+curl "http://localhost:3000/images?limit=5&offset=0"
+```
 
-- Terraform
-- AWS VPC
-- ECS Fargate
-- ECR
-- RDS
-- S3
-- SQS
-- IAM
-- CloudWatch
-- CI/CD
+### Buscar imagem por ID
+
+```bash
+curl http://localhost:3000/images/{id}
+```
+
+### Deletar imagem
+
+```bash
+curl -X DELETE http://localhost:3000/images/{id}
+```
+
+### Health check
+
+```bash
+curl http://localhost:3000/health
+```
+
+---
+
+## Fluxo de Processamento
+
+1. Usuário envia imagem via `POST /images`
+2. API salva no PostgreSQL (status: `UPLOADED`), envia para S3 e envia mensagem para SQS
+3. Worker recebe a mensagem, baixa do S3, processa com Sharp (gera WebP + thumbnail)
+4. Worker salva os arquivos processados no S3 e atualiza o status para `PROCESSED`
+
+Status possíveis: `UPLOADED` → `PROCESSING` → `PROCESSED` | `FAILED`
+
+---
+
+## Scripts úteis
+
+| Comando | Descrição |
+|---------|-----------|
+| `npm run start:dev` | API em modo dev (hot reload) |
+| `npm run worker:dev` | Worker em modo dev |
+| `npm run db:push` | Push do schema para o banco |
+| `npm run db:studio` | Abrir Drizzle Studio (UI do banco) |
+| `npm run test` | Rodar testes |
+| `npm run lint` | Verificar lint |
+
+---
+
+## Variáveis de Ambiente
+
+| Variável | Descrição | Default |
+|----------|-----------|---------|
+| `PORT` | Porta da API | `3000` |
+| `DATABASE_URL` | URL do PostgreSQL | `postgresql://postgres:postgres@localhost:5433/image_processing` |
+| `AWS_REGION` | Região AWS | `us-east-1` |
+| `AWS_ENDPOINT` | Endpoint do S3/SQS (LocalStack) | `http://localhost:4566` |
+| `AWS_S3_BUCKET` | Nome do bucket | `image-processing-bucket` |
+| `AWS_SQS_QUEUE_URL` | URL da fila SQS | `http://localhost:4566/000000000000/image-processing` |

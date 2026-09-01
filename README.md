@@ -10,11 +10,16 @@ API para upload e processamento assíncrono de imagens. O sistema recebe imagens
 
 ## Como Rodar
 
-### 1. Subir infraestrutura (PostgreSQL + LocalStack/S3/SQS)
+### 1. Subir infraestrutura (PostgreSQL + Floci/S3/SQS)
 
 ```bash
 docker compose up -d postgres floci
 ```
+
+| Serviço | Porta |
+|---------|-------|
+| PostgreSQL | `localhost:5433` |
+| Floci (S3/SQS) | `localhost:4566` |
 
 ### 2. Instalar dependências
 
@@ -34,7 +39,7 @@ cp .env.example .env
 npm run db:migrate
 ```
 
-### 5. Criar bucket S3 no LocalStack
+### 5. Criar bucket S3 no Floci
 
 ```bash
 aws --endpoint-url=http://localhost:4566 s3 mb s3://image-processing-bucket --region us-east-1
@@ -43,7 +48,7 @@ aws --endpoint-url=http://localhost:4566 s3 mb s3://image-processing-bucket --re
 ### 6. Iniciar API e Worker (em terminais separados)
 
 ```bash
-# Terminal 1 - API
+# Terminal 1 - API (porta 3000)
 npm run start:dev
 
 # Terminal 2 - Worker
@@ -51,6 +56,8 @@ npm run worker:dev
 ```
 
 A API estará disponível em `http://localhost:3000`.
+
+> **Docker Compose**: Se rodar tudo via `docker compose up`, a API fica em `http://localhost:3002`.
 
 ---
 
@@ -113,7 +120,7 @@ Status possíveis: `UPLOADED` → `PROCESSING` → `PROCESSED` | `FAILED`
 
 | Comando | Descrição |
 |---------|-----------|
-| `npm run start:dev` | API em modo dev (hot reload) |
+| `npm run start:dev` | API em modo dev (hot reload) - porta 3000 |
 | `npm run worker:dev` | Worker em modo dev |
 | `npm run db:push` | Push do schema para o banco |
 | `npm run db:studio` | Abrir Drizzle Studio (UI do banco) |
@@ -129,6 +136,6 @@ Status possíveis: `UPLOADED` → `PROCESSING` → `PROCESSED` | `FAILED`
 | `PORT` | Porta da API | `3000` |
 | `DATABASE_URL` | URL do PostgreSQL | `postgresql://postgres:postgres@localhost:5433/image_processing` |
 | `AWS_REGION` | Região AWS | `us-east-1` |
-| `AWS_ENDPOINT` | Endpoint do S3/SQS (LocalStack) | `http://localhost:4566` |
+| `AWS_ENDPOINT` | Endpoint do S3/SQS (Floci) | `http://localhost:4566` |
 | `AWS_S3_BUCKET` | Nome do bucket | `image-processing-bucket` |
 | `AWS_SQS_QUEUE_URL` | URL da fila SQS | `http://localhost:4566/000000000000/image-processing` |

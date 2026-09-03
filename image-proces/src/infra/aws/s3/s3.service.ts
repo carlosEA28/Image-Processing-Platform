@@ -19,15 +19,17 @@ export class S3FileStorage implements FileStorage, OnModuleInit {
 
   constructor(private readonly configService: ConfigService) {
     const endpoint = this.configService.get<string>('AWS_ENDPOINT');
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID') || '';
+
     this.s3Client = new S3Client({
       region: this.configService.get<string>('AWS_REGION'),
       ...(endpoint && { endpoint, forcePathStyle: true }),
-      credentials: {
-        accessKeyId:
-          this.configService.get<string>('AWS_ACCESS_KEY_ID') || '',
-        secretAccessKey:
-          this.configService.get<string>('AWS_SECRET_ACCESS_KEY') || '',
-      },
+      ...(accessKeyId && {
+        credentials: {
+          accessKeyId,
+          secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY') || '',
+        },
+      }),
     });
     this.bucket = this.configService.get<string>('AWS_S3_BUCKET') || '';
   }

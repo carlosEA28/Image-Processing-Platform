@@ -46,7 +46,9 @@ export class ImageProcessingWorker implements OnModuleDestroy {
     }
 
     try {
-      const queueUrl = await this.sqsService.ensureQueue('image-processing');
+      const queueUrl = await this.sqsService.ensureQueue(
+        this.configService.get<string>('AWS_SQS_QUEUE_NAME') || 'image-processing',
+      );
 
       const messages = await this.sqsService.receive(queueUrl);
 

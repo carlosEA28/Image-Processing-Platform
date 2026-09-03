@@ -19,15 +19,17 @@ export class SqsMessageQueue implements MessageQueue {
 
   constructor(private readonly configService: ConfigService) {
     this.endpoint = this.configService.get<string>('AWS_ENDPOINT') || '';
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID') || '';
+
     this.sqsClient = new SQSClient({
       region: this.configService.get<string>('AWS_REGION'),
       ...(this.endpoint && { endpoint: this.endpoint }),
-      credentials: {
-        accessKeyId:
-          this.configService.get<string>('AWS_ACCESS_KEY_ID') || '',
-        secretAccessKey:
-          this.configService.get<string>('AWS_SECRET_ACCESS_KEY') || '',
-      },
+      ...(accessKeyId && {
+        credentials: {
+          accessKeyId,
+          secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY') || '',
+        },
+      }),
     });
   }
 
